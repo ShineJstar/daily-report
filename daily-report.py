@@ -346,7 +346,7 @@ class RESTUser(object):
             else:
                 records = sql_exec("select u.user_id,u.user_name "
                     "from dr_user u,dr_group g,dr_rs_group_user rs "
-                    "where rs.user_id = u.user_id and g.group_id = rs.group_id and g.group_id = %s", (group));
+                    "where rs.user_id = u.user_id and g.group_id = rs.group_id and g.group_id = %s", (group,));
         else:
             if group == "" or str(group) == "-1":
                 records = sql_exec("select user_id,user_name from dr_user where enabled=true");
@@ -354,7 +354,7 @@ class RESTUser(object):
                 records = sql_exec("select u.user_id,u.user_name "
                     "from dr_user u,dr_group g,dr_rs_group_user rs "
                     "where u.enabled=true "
-                        "and rs.user_id = u.user_id and g.group_id = rs.group_id and g.group_id = %s", (group));
+                        "and rs.user_id = u.user_id and g.group_id = rs.group_id and g.group_id = %s", (group,));
         
         user_id = None;
         auth = _config["auth"];

@@ -26,5 +26,5 @@ cd $dir &&
 rm -rf mysqlclient-python-1.3.12 &&
 tar xf mysqlclient-python-1.3.12.tar.gz &&
 cd mysqlclient-python-1.3.12 &&
-python setup.py install --user
+python setup.py install
 ret=$? && if [[ $ret -ne 0 ]]; then echo "cherrypy+mysql error $ret"; exit $ret; fi

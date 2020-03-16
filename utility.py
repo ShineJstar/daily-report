@@ -167,11 +167,12 @@ def sql_exec(sql, params = None, get_inserted_id=False):
         trace("connect to mysql, config=%s"%(mysql_config));
         
         host = mysql_config["host"];
+        port = mysql_config["port"];
         user = mysql_config["user"];
         passwd = mysql_config["passwd"];
         db = mysql_config["db"];
         
-        conn = MySQLdb.connect(host, user, passwd, db, charset='utf8');
+        conn = MySQLdb.connect(host=host, port=port, user=user, passwd=passwd, db=db, charset='utf8');
         cursor = conn.cursor(MySQLdb.cursors.DictCursor);
         
         trace("execute sql: %s params(%s): %s"%(sql, type(params), params));
