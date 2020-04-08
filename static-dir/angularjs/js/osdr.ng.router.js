@@ -53,6 +53,10 @@ var links = {
      report: {
          mount: "/report", link: "#/report",
          page: "views/report.html", controller: "CReport", text: "周报分析"
+     },
+     personal: {
+        mount: "/personal", link: "#/personal",
+        page: "views/personal.html", controller: "CPersonal", text: "个人日报"
      }
 };
 
@@ -91,6 +95,9 @@ osdrApp.config(['$routeProvider', function($routeProvider) {
         .when(links.group.mount, {
             templateUrl: links.group.page, controller: links.group.controller
         })
+        .when(links.personal.mount, {
+            templateUrl: links.personal.page, controller: links.personal.controller
+        })
         .otherwise({
             redirectTo: links.submit.mount
         });
@@ -101,7 +108,7 @@ osdrApp.config(['$routeProvider', function($routeProvider) {
 }])
 //  controllers for app
 .controller('CMain', ['$scope', '$location', function($scope, $location) {
-    $scope.nav_brand_title = get_system_name() + "(v" + version + ")";
+    $scope.nav_brand_title = get_system_name() // + "(v" + version + ")";
     $scope.__nav_active = null;
 
     // the navigator bind and update.
@@ -111,7 +118,8 @@ osdrApp.config(['$routeProvider', function($routeProvider) {
         report: {mount: links.report.mount, url: links.report.link, text: links.report.text, target:"_self"},
         user: {mount: links.user.mount, url: links.user.link, text: links.user.text, target:"_self"},
         category: {mount: links.category.mount, url: links.category.link, text: links.category.text, target:"_self"},
-        group: {mount: links.group.mount, url: links.group.link, text: links.group.text, target:"_self"}
+        group: {mount: links.group.mount, url: links.group.link, text: links.group.text, target:"_self"},
+        personal: {mount: links.personal.mount, url: links.personal.link, text: links.personal.text, target:"_self"}
     };
     $scope.get_nav_active = function() {
         return $scope.__nav_active? $scope.__nav_active: $scope.navs.servers;
@@ -133,6 +141,9 @@ osdrApp.config(['$routeProvider', function($routeProvider) {
     };
     $scope.nav_active_group = function() {
         $scope.__nav_active = $scope.navs.group;
+    };
+    $scope.nav_active_personal = function() {
+        $scope.__nav_active = $scope.navs.personal;
     };
     $scope.is_nav_selected = function(nav_or_navs) {
         if ($scope.__nav_active == nav_or_navs) {
@@ -2179,6 +2190,275 @@ osdrControllers.controller('CReport', ['$scope', '$routeParams', '$location', 'M
 
     $scope.$parent.nav_active_report();
     $scope.on_change_this_week();
+    logs.info("数据加载中");
+}]);
+
+// controller: CPersonal, for the personal personal.html.
+osdrControllers.controller('CPersonal', ['$scope', '$routeParams', '$location', 'MGroup', 'MUser', 'MProduct', 'MType', 'MReport',
+    function($scope, $routeParams, $location, MGroup, MUser, MProduct, MType, MReport) {
+    var now = new Date();
+    // the query conditions.
+    $scope.query = {
+        userId: null,
+        group: null,
+        all: false,
+        date: absolute_seconds_to_YYYYmmdd(new Date().getTime() / 1000),
+        startDate: absolute_seconds_to_YYYYmmdd(now.getTime() / 1000),
+        endDate: absolute_seconds_to_YYYYmmdd(now.getTime() / 1000)
+    };
+    // consts
+    $scope.const_time_unit = get_view_sum_unit_label();
+    // the groups from server.
+    $scope.groups = {};
+    // the users of group in query.
+    $scope.users = {};
+    // the products of group in query.
+    $scope.products = {};
+    // the types of group in query.
+    $scope.types = {};
+    // the report of query
+    $scope.reports = {};
+    // query report info from server.
+    $scope.on_query = function() {
+        $scope.reports.user_data = [];
+        $scope.reports.day_product_data = [];
+        $scope.reports.day_type_data = [];
+        $scope.reports.month_product_data = [];
+        $scope.reports.month_type_data = [];
+        $scope.reports.week_product_data = [];
+        $scope.reports.week_type_data = [];
+        $scope.reports.quarter_product_data = [];
+        $scope.reports.quarter_type_data = [];
+        $scope.reports.year_product_data = [];
+        $scope.reports.year_type_data = [];
+        // render data
+        $scope.reports.years = [];
+        $scope.reports.quarters = [];
+        $scope.reports.months = [];
+        $scope.reports.weeks = [];
+        $scope.reports.days = [];
+        $scope.reports.summaries = [];
+        $scope.reports.users = [];
+
+        MUser.users_load({
+            r: Math.random(),
+            query_all: $scope.query.all,
+            group: $scope.query.group
+        }, function(data){
+            $scope.users = api_users_for_select(data);
+            if(!$scope.query.userId) {
+                $scope.query.userId = $scope.users.users.length > 0 ? $scope.users.users[0].name : null;
+            }
+            logs.info("组用户加载成功");
+            MProduct.products_load({r: Math.random()}, function(data){
+                $scope.products = api_products_for_select(data);
+                logs.info("产品类型加载成功");
+                // request types
+                MType.types_load({r: Math.random()}, function(data){
+                    $scope.types = api_types_for_select(data);
+                    logs.info("工作类别加载成功");
+                    query_report_user_detail();
+                });
+            });
+        });
+    };
+    
+    var query_report_user_detail = function(){
+        if (!$scope.users.first) {
+            logs.warn(0, "选择的组没有用户");
+            return;
+        }
+        if (!$scope.query.userId) {
+            logs.warn(0, "没有选择的用户");
+            return;
+        }
+
+        logs.info("请求日期" + $scope.query.date + "的日报数据");
+        var responsed_count = 0;
+        var total_day = Math.floor((YYYYmmdd_parse($scope.query.endDate) - YYYYmmdd_parse($scope.query.startDate)) / (24 * 3600 * 1000)) + 1;
+        var userId = $scope.query.userId
+        var userName = $scope.users.kv[userId];
+        for(var start = YYYYmmdd_parse($scope.query.startDate); start <= YYYYmmdd_parse($scope.query.endDate); start.setDate(start.getDate() + 1)) {
+            var date = absolute_seconds_to_YYYYmmdd(start / 1000)
+            logs.info("请求用户" + userName + "在" + date + "的数据");
+            var do_request = function(user){
+                MReport.reports_load({
+                    r: Math.random(),
+                    summary: 0,
+                    query_all: $scope.query.all,
+                    group: $scope.query.group,
+                    start_time: date,
+                    end_time: date,
+                    user_id: user.name
+                }, function(data){
+                    if (data.data.length > 0) {
+                        $scope.reports.user_data.push(data.data);
+                    }
+                    logs.info("加载" + user.value + "日报数据成功，共" + data.data.length + "条日报");
+                    // if all data requested, request other messages.
+                    if(++responsed_count >= total_day){
+                        logs.info("加载用户日报成功");
+                        render_report();
+                        return;
+                    }
+                });
+            };
+            do_request({name: userId, value: userName});
+        }
+    };
+    var render_report = function() {
+        logs.info("数据查询完毕，展示日报");
+        render_user();
+    };
+    
+    var render_user = function() {
+        logs.info("展示用户详细数据");
+        $scope.reports.user_data.sort(user_id_sort);
+
+        if($scope.reports.user_data.length <= 0){
+            return;
+        }
+
+        for(var i = 0; i < $scope.reports.user_data.length; i++){
+            var user_data = $scope.reports.user_data[i];
+            var user = {
+                works: [],
+                summary: {
+                    total: null,
+                    insert: null,
+                    modify: null
+                },
+                product: {
+                    text: null,
+                    labels: [],
+                    values: [],
+                    total_value: 0
+                },
+                type: {
+                    text: null,
+                    labels: [],
+                    values: [],
+                    total_value: 0
+                },
+                work_date: user_data[0].work_date.substr(0, 10)
+            };
+
+            for(var j = 0; j < user_data.length; j++) {
+                var o = user_data[j];
+                user.name = $scope.users.kv[o.user_id];
+                user.works.push({
+                    id: o.report_id,
+                    bug: o.bug_id,
+                    time: o.work_hours,
+                    type: $scope.types.kv[o.type_id],
+                    product: $scope.products.kv[o.product_id],
+                    content: o.report_content
+                });
+            }
+            user.works.sort(function(a,b){
+                return system_array_sort_asc(a.id, b.id);
+            });
+
+            if(1){
+                var total_value = 0;
+                var products_merged = {};
+                for(var j = 0; j < user_data.length; j++){
+                    var o = user_data[j];
+                    products_merged[$scope.products.kv[o.product_id]] = 0;
+                }
+                for(var j = 0; j < user_data.length; j++){
+                    var o = user_data[j];
+                    total_value += o.work_hours;
+                    products_merged[$scope.products.kv[o.product_id]] += o.work_hours;
+                }
+
+                // dump to object array for sort
+                var products_merged_object_array = [];
+                for(var key in products_merged){
+                    products_merged_object_array.push({name:key, work_hours:products_merged[key]});
+                }
+                products_merged_object_array.sort(work_hours_sort);
+
+                // summaries
+                user_data.sort(report_first_insert_sort);
+                var first_insert = user_data[0].insert_date;
+                user_data.sort(report_modify_date_sort);
+                var last_modify = user_data[0].modify_date;
+                user.summary.total = Number(Number(total_value).toFixed(1));
+                user.summary.insert = first_insert;
+                user.summary.modify = last_modify;
+
+                var values = [];
+                var labels = [];
+                for(var j = 0; j < products_merged_object_array.length; j++){
+                    var key = products_merged_object_array[j].name;
+                    var work_hours = products_merged_object_array[j].work_hours;
+
+                    labels.push(key);
+                    var percent = work_hours * 100 / total_value;
+                    percent = Number(Number(percent).toFixed(1));
+                    values.push(percent);
+                }
+
+                user.product.total_value = total_value;
+                user.product.labels = labels;
+                user.product.values = values;
+            }
+
+            if(1){
+                var total_value = 0;
+                var types_merged = {};
+                for(var j = 0; j < user_data.length; j++){
+                    var o = user_data[j];
+                    types_merged[$scope.types.kv[o.type_id]] = 0;
+                }
+                for(var j = 0; j < user_data.length; j++){
+                    var o = user_data[j];
+                    total_value += o.work_hours;
+                    types_merged[$scope.types.kv[o.type_id]] += o.work_hours;
+                }
+
+                // dump to object array for sort
+                var types_merged_object_array = [];
+                for(var key in types_merged){
+                    types_merged_object_array.push({name:key, work_hours:types_merged[key]});
+                }
+                types_merged_object_array.sort(work_hours_sort);
+
+                var values = [];
+                var labels = [];
+                for(var j = 0; j < types_merged_object_array.length; j++){
+                    var key = types_merged_object_array[j].name;
+                    var work_hours = types_merged_object_array[j].work_hours;
+
+                    labels.push(key);
+                    var percent = work_hours * 100 / total_value;
+                    percent = Number(Number(percent).toFixed(1));
+                    values.push(percent);
+                }
+
+                user.type.total_value = total_value;
+                user.type.labels = labels;
+                user.type.values = values;
+            }
+
+            $scope.reports.users.push(user);
+        }
+    };
+
+    // loads groups info.
+    MGroup.groups_load({r: Math.random()}, function(data){
+        logs.info("加载用户组成功");
+        $scope.groups = api_groups_for_select(data);
+        $scope.query.group = $scope.groups.first;
+
+        // auto show.
+        if (true || $routeParams.show) {
+            $scope.on_query();
+        }
+    });
+
+    $scope.$parent.nav_active_personal();
     logs.info("数据加载中");
 }]);
 
