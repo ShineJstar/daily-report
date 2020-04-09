@@ -47,6 +47,9 @@
                     <li ng-class='is_nav_selected(navs.view) |main_nav_active'>
                         <a ng-href="{{navs.view.url}}" target="{{navs.view.target}}" ng-bind="navs.view.text"></a>
                     </li>
+                    <li ng-class='is_nav_selected(navs.personal) |main_nav_active'>
+                        <a ng-href="{{navs.personal.url}}" target="{{navs.personal.target}}" ng-bind="navs.personal.text"></a>
+                    </li>
                     <li ng-class='is_nav_selected(navs.report) |main_nav_active'>
                         <a ng-href="{{navs.report.url}}" target="{{navs.report.target}}" ng-bind="navs.report.text"></a>
                     </li>
