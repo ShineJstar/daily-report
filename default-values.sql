@@ -1,4 +1,4 @@
-use os_daily_report;
+use daily_report;
 
 set names utf8;
 

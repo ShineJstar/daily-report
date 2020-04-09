@@ -2313,7 +2313,9 @@ osdrControllers.controller('CPersonal', ['$scope', '$routeParams', '$location', 
     
     var render_user = function() {
         logs.info("展示用户详细数据");
-        $scope.reports.user_data.sort(user_id_sort);
+        $scope.reports.user_data.sort(function(a, b) {
+            return a[0].work_date > b[0].work_date ? 1 : a[0].work_date === b[0].work_date ? 0 : -1
+        });
 
         if($scope.reports.user_data.length <= 0){
             return;

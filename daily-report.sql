@@ -1,6 +1,6 @@
-DROP DATABASE IF EXISTS os_daily_report;
-CREATE DATABASE os_daily_report;
-USE os_daily_report;
+DROP DATABASE IF EXISTS daily_report;
+CREATE DATABASE daily_report;
+USE daily_report;
 
 DROP TABLE IF EXISTS `dr_product`;
 CREATE TABLE `dr_product`( 
